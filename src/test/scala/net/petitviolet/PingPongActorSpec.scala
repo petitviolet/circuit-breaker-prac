@@ -1,4 +1,4 @@
-package com.example
+package net.petitviolet
 
 import akka.actor.ActorSystem
 import akka.actor.Actor

@@ -1,4 +1,4 @@
-package com.example
+package net.petitviolet
 
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.pattern.{CircuitBreaker, ask}
