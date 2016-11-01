@@ -41,12 +41,14 @@ object Supervisor {
 
   private def maxFailCount(config: Config): Int = config.getInt("max-fail-count")
   private def runTimeout(config: Config): FiniteDuration = Duration(config.getLong("run-timeout"), TimeUnit.MILLISECONDS)
-  private def resetWait(config: Config): FiniteDuration = Duration(config.getLong("rest-wait"), TimeUnit.MILLISECONDS)
+  private def resetWait(config: Config): FiniteDuration = Duration(config.getLong("reset-wait"), TimeUnit.MILLISECONDS)
 }
 
-final class Supervisor[T] private(maxFailCount: Int, runTimeout: FiniteDuration, resetWait: FiniteDuration) extends Actor {
+final class Supervisor[T] private(maxFailCount: Int,
+                                  runTimeout: FiniteDuration,
+                                  resetWait: FiniteDuration) extends Actor with ActorLogging {
   private var failedCount = 0
-  private var state: State = Open
+  private var state: State = Close
 
   override def receive: Receive = sendToChild
 
@@ -94,8 +96,10 @@ final class Supervisor[T] private(maxFailCount: Int, runTimeout: FiniteDuration,
   private def sendToChild: Receive = {
     case message: ExecuteMessage[T] =>
       // if fail, catch on `supervisorStrategy`
+      log.info(s"state: $state, message: $message")
       buildChildExecutorActor(message) ! Run
     case ChildResult(originalSender, result) =>
+      log.info(s"state: $state, result: $result")
       if (this.state == HalfOpen) becomeClose()
       // response from `ExecuteActor`, proxy to originalSender
       originalSender ! result
@@ -119,9 +123,10 @@ final class Supervisor[T] private(maxFailCount: Int, runTimeout: FiniteDuration,
  */
 private class ExecutorActor[T](originalSender: ActorRef,
                                message: ExecuteMessage[T],
-                               timeout: FiniteDuration) extends Actor {
+                               timeout: FiniteDuration) extends Actor with ActorLogging {
   override def receive: Actor.Receive = {
     case Run =>
+      log.debug(s"message: $message")
       val resultTry: Try[T] = Try { Await.result(message.run, timeout) }
       resultTry match {
         case Success(result) => originalSender ! result
