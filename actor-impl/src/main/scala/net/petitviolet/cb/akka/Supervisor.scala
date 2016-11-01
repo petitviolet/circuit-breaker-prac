@@ -71,21 +71,27 @@ final class Supervisor[T] private(maxFailCount: Int,
   }
 
   private def becomeClose() = {
+    log.info(s"state: $state => Close")
     this.state = Close
     context.become(sendToChild)
   }
 
-  private def becomeHalfOpen() = {
+  private def becomeHalfOpen(context: ActorContext) = {
+    log.info(s"state: $state => HalfOpen")
     this.state = HalfOpen
     context.become(sendToChild)
   }
 
   private def becomeOpen() = {
+    log.info(s"state: $state => Open")
     this.state = Open
     context.become(responseException)
     // schedule to become `HalfOpen` state after defined `resetWait`.
     context.system.scheduler.scheduleOnce(resetWait, new Runnable {
-      override def run(): Unit = becomeHalfOpen()
+      override def run(): Unit = {
+        log.debug(s"state: Open => HalfOpen after $resetWait")
+        becomeHalfOpen(context)
+      }
     })(context.dispatcher)
   }
 
@@ -100,7 +106,13 @@ final class Supervisor[T] private(maxFailCount: Int,
       buildChildExecutorActor(message) ! Run
     case ChildResult(originalSender, result) =>
       log.info(s"state: $state, result: $result")
-      if (this.state == HalfOpen) becomeClose()
+      if (this.state == HalfOpen) {
+        log.info(s"----------------------------")
+        becomeClose()
+      } else {
+        log.info(s"***************************")
+
+      }
       // response from `ExecuteActor`, proxy to originalSender
       originalSender ! result
   }
@@ -114,7 +126,14 @@ final class Supervisor[T] private(maxFailCount: Int,
    * Only `Open` state.
    */
   private def responseException: Receive = {
-    case Execute => new MessageOnOpenException(s"receive on `Open` state").printStackTrace()
+    case Execute(run) =>
+      log.debug(s"state: $state, received: $Execute")
+      throw new MessageOnOpenException(s"receive on `Open` state")
+    case ChildResult(originalSender, result) =>
+      log.debug(s"state: $state, result: $result")
+      if (this.state == HalfOpen) becomeClose()
+      // response from `ExecuteActor`, proxy to originalSender
+      originalSender ! result
   }
 }
 
@@ -126,13 +145,13 @@ private class ExecutorActor[T](originalSender: ActorRef,
                                timeout: FiniteDuration) extends Actor with ActorLogging {
   override def receive: Actor.Receive = {
     case Run =>
-      log.debug(s"message: $message")
+      log.debug(s"ExecutorActor: $message")
       val resultTry: Try[T] = Try { Await.result(message.run, timeout) }
       resultTry match {
-        case Success(result) => originalSender ! result
+        case Success(result) => originalSender ! ChildResult(originalSender, result)
         case Failure(t) =>
           message match {
-            case ExecuteWithFallback(_, fallback) => originalSender ! fallback
+            case ExecuteWithFallback(_, fallback) => originalSender ! ChildResult(originalSender, fallback)
             case _ => throw t
           }
       }
