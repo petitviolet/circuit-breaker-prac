@@ -12,7 +12,7 @@ package object prac {
   class UnstableActor extends Actor with ActorLogging {
     override def receive: Receive = {
       case Message(value) =>
-        log.info(value)
+        log.info(s"UnstableActor: $value")
         sender ! s"receive: $value"
       case PanicMessage =>
         // just fail
