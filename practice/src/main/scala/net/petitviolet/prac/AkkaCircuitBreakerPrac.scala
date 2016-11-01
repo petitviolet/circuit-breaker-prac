@@ -1,4 +1,4 @@
-package net.petitviolet
+package net.petitviolet.prac
 
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.pattern.{CircuitBreaker, ask}
