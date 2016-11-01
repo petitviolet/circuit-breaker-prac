@@ -1,0 +1,59 @@
+package net.petitviolet.prac
+
+import akka.actor.{Props, ActorSystem}
+import akka.pattern.ask
+import com.typesafe.config.ConfigFactory
+import net.petitviolet.cb.akka.{Execute, Supervisor}
+
+import scala.concurrent.ExecutionContext
+
+
+object SupervisorPrac extends App {
+  implicit val system = ActorSystem(s"SupervisorPrac")
+  implicit val dispatcher: ExecutionContext = ExecutionContext.Implicits.global
+
+  val config = ConfigFactory.load().getConfig("supervisor")
+
+  val supervisorActor = system.actorOf(Supervisor.props(config))
+
+  val actorRef = system.actorOf(Props[UnstableActor])
+
+  // state is close
+  supervisorActor ! Execute(actorRef ? Message("1"))
+  supervisorActor ! Execute(actorRef ? Message("2"))
+
+  // failure once
+  supervisorActor ! Execute(actorRef ? PanicMessage)
+  // sleep over `callTimeout`
+  Thread.sleep(1500)
+  // state is still close
+
+  supervisorActor ! Execute(actorRef ? Message("3"))
+  // state is close
+
+  // force open by over `maxFailure` failures
+  supervisorActor ! Execute(actorRef ? PanicMessage)
+  supervisorActor ! Execute(actorRef ? HeavyMessage)
+  // wait Thread.sleep at receive `HeavyMesage`
+  Thread.sleep(3000)
+  // state gets open
+
+  // message goes dead-queue
+  supervisorActor ! Execute(actorRef ? Message("4"))
+  // state is still open
+  Thread.sleep(3500)
+  // state gets half-open after `resetTimeout`
+
+  supervisorActor ! Execute(actorRef ? Message("5"))
+  // state gets close
+
+  // still close
+  Thread.sleep(1000)
+  supervisorActor ! Execute(actorRef ? Message("6"))
+  supervisorActor ! Execute(actorRef ? Message("7"))
+  supervisorActor ! Execute(actorRef ? Message("8"))
+
+  // shutdown
+  Thread.sleep(1000)
+  system.terminate()
+}
