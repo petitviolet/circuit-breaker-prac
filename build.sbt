@@ -27,6 +27,7 @@ lazy val root = (project in file("."))
 
 lazy val practice = (project in file("practice"))
   .settings(commonSettings("practice"))
+  .dependsOn(actorImpl)
 
 lazy val actorImpl = (project in file("actor-impl"))
   .settings(commonSettings("actorImpl"))
