@@ -76,7 +76,9 @@ final class Supervisor[T] private(maxFailCount: Int,
     context.become(sendToChild)
   }
 
-  private def becomeHalfOpen(context: ActorContext) = {
+  private case object BecomeHalfOpen
+
+  private def becomeHalfOpen() = {
     log.info(s"state: $state => HalfOpen")
     this.state = HalfOpen
     context.become(sendToChild)
@@ -87,12 +89,7 @@ final class Supervisor[T] private(maxFailCount: Int,
     this.state = Open
     context.become(responseException)
     // schedule to become `HalfOpen` state after defined `resetWait`.
-    context.system.scheduler.scheduleOnce(resetWait, new Runnable {
-      override def run(): Unit = {
-        log.debug(s"state: Open => HalfOpen after $resetWait")
-        becomeHalfOpen(context)
-      }
-    })(context.dispatcher)
+    context.system.scheduler.scheduleOnce(resetWait, self, BecomeHalfOpen)(context.dispatcher)
   }
 
   /**
@@ -100,6 +97,10 @@ final class Supervisor[T] private(maxFailCount: Int,
    * Only `Close` or `HalfOpen` state.
    */
   private def sendToChild: Receive = {
+    case BecomeHalfOpen =>
+      if (this.state == Open) {
+        becomeHalfOpen()
+      }
     case message: ExecuteMessage[T] =>
       // if fail, catch on `supervisorStrategy`
       log.info(s"state: $state, message: $message")
