@@ -1,11 +1,12 @@
-package net.petitviolet
+package net.petitviolet.ex
 
 import akka.actor.{ ActorLogging, Actor }
 import akka.util.Timeout
 
 import scala.concurrent.duration._
 
-package object prac {
+object common {
+
   case class Message(value: String)
   case object PanicMessage
   case object HeavyMessage

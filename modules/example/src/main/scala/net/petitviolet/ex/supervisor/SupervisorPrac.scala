@@ -1,10 +1,11 @@
-package net.petitviolet.prac
+package net.petitviolet.ex.supervisor
 
 import java.util.concurrent.ForkJoinPool
 
-import akka.actor.{ Props, ActorSystem }
+import akka.actor.{ ActorSystem, Props }
 import akka.pattern.ask
 import com.typesafe.config.ConfigFactory
+import net.petitviolet.ex.common._
 import net.petitviolet.supervisor._
 
 import scala.concurrent.ExecutionContext

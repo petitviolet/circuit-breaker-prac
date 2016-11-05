@@ -24,10 +24,10 @@ def commonSettings(projectName: String) = Seq(
 
 lazy val root = (project in file("."))
   .settings(name := "circuit-breaker-prac")
-  .aggregate(practice, supervisor)
+  .aggregate(example, supervisor)
 
-lazy val practice = (project in file("modules/practice"))
-  .settings(commonSettings("practice"))
+lazy val example = (project in file("modules/example"))
+  .settings(commonSettings("example"))
   .dependsOn(supervisor)
 
 lazy val supervisor = (project in file("modules/supervisor"))

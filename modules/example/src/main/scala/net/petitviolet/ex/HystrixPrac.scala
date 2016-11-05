@@ -1,4 +1,4 @@
-package net.petitviolet.prac
+package net.petitviolet.ex
 
 import java.util.concurrent.{ Future => jFuture }
 
@@ -55,7 +55,7 @@ private case class Result(value: String) extends AnyVal
 private object UnstableCommand {
   val key = HystrixCommandGroupKey.Factory.asKey("my-command")
 }
-import net.petitviolet.prac.UnstableCommand._
+import net.petitviolet.ex.UnstableCommand._
 
 /**
  * use Circuit-Breaker with implementing [[HystrixCommand]]

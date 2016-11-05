@@ -1,7 +1,8 @@
-package net.petitviolet.prac
+package net.petitviolet.ex
 
 import akka.actor.{ ActorSystem, Props }
 import akka.pattern.{ CircuitBreaker, ask }
+import common._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
