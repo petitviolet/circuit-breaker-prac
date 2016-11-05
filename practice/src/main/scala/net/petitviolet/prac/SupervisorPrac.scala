@@ -5,7 +5,7 @@ import java.util.concurrent.ForkJoinPool
 import akka.actor.{Props, ActorSystem}
 import akka.pattern.ask
 import com.typesafe.config.ConfigFactory
-import net.petitviolet.cb.akka.{Execute, Supervisor}
+import net.petitviolet.akka.supervisor._
 
 import scala.concurrent.ExecutionContext
 

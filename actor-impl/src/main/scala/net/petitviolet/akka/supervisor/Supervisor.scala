@@ -1,32 +1,29 @@
-package net.petitviolet.cb.akka
+package net.petitviolet.akka.supervisor
+
+//package supervisor
 
 import java.util.concurrent.{ForkJoinPool, TimeUnit}
 
-import akka.actor.Actor.Receive
-import akka.actor.SupervisorStrategy.{Stop, Restart}
+import akka.actor.SupervisorStrategy.Stop
 import akka.actor._
-import akka.pattern.ask
-import com.typesafe.config.{ConfigFactory, Config}
-import net.petitviolet.cb.akka.ExecutorActor.{ChildFailure, ChildSuccess, Run}
-import net.petitviolet.cb.akka.Supervisor.{BecomeHalfOpen, MessageOnOpenException}
+import com.typesafe.config.Config
+import net.petitviolet.akka.supervisor.ExecutorActor._
+import net.petitviolet.akka.supervisor.Supervisor._
 
-import scala.concurrent.{ExecutionContext, Await, Future}
-import scala.concurrent.duration.{FiniteDuration, Duration}
+import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
-import scala.util.{Try, Failure, Success}
 
 private sealed trait State
 private case object Close extends State
 private case object HalfOpen extends State
 private case object Open extends State
 
-sealed trait Message extends Any
-
-sealed trait ExecuteMessage[T] extends Message {
+sealed trait ExecuteMessage[T] {
   val run: Future[T]
 }
 
-case class Execute[T] private (run: Future[T]) extends ExecuteMessage[T]
+case class Execute[T](run: Future[T]) extends ExecuteMessage[T]
 
 case class ExecuteWithFallback[T](run: Future[T], fallback: T) extends ExecuteMessage[T]
 
@@ -142,44 +139,3 @@ final class Supervisor[T] private(maxFailCount: Int,
       originalSender ! Status.Failure(t)
   }
 }
-
-/**
- * Internal API
- */
-private class ExecutorActor[T](originalSender: ActorRef,
-                               message: ExecuteMessage[T],
-                               timeout: FiniteDuration) extends Actor with ActorLogging {
-  override def receive: Actor.Receive = {
-    case Run =>
-      log.debug(s"ExecutorActor: $message")
-      val resultTry: Try[T] = Try { Await.result(message.run, timeout) }
-      resultTry match {
-        case Success(result) =>
-          respondToParent(originalSender, result)
-        case Failure(t) =>
-          message match {
-            case ExecuteWithFallback(_, fallback) =>
-              respondToParent(originalSender, fallback)
-            case _ =>
-              sender ! ChildFailure(originalSender, t)
-          }
-      }
-  }
-
-  private def respondToParent(originalSender: ActorRef, result: T) = {
-    sender() ! ChildSuccess(originalSender, result)
-  }
-}
-
-/**
- * Internal API
- */
-private object ExecutorActor {
-  object Run
-  case class ChildSuccess[T](originalSender: ActorRef, result: T)
-  case class ChildFailure(originalSender: ActorRef, cause: Throwable)
-
-  def props[T](originalSender: ActorRef, execute: ExecuteMessage[T], timeout: FiniteDuration): Props =
-    Props(classOf[ExecutorActor[T]], originalSender, execute, timeout)
-}
-
