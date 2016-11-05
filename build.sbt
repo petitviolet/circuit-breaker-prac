@@ -26,10 +26,10 @@ lazy val root = (project in file("."))
   .settings(name := "circuit-breaker-prac")
   .aggregate(example, supervisor)
 
-lazy val example = (project in file("modules/example"))
+lazy val example = (project in file("example"))
   .settings(commonSettings("example"))
   .dependsOn(supervisor)
 
-lazy val supervisor = (project in file("modules/supervisor"))
+lazy val supervisor = (project in file("supervisor"))
   .settings(commonSettings("supervisor"))
 
