@@ -15,7 +15,8 @@ lazy val logDependencies = Seq(
   "org.slf4j" % "slf4j-api" % "1.7.21"
 )
 
-def commonSettings(name: String) = Seq(
+def commonSettings(projectName: String) = Seq(
+  name := projectName,
   scalaVersion := "2.11.8",
   version := "1.0",
   libraryDependencies := commonDependencies
@@ -23,12 +24,12 @@ def commonSettings(name: String) = Seq(
 
 lazy val root = (project in file("."))
   .settings(name := "circuit-breaker-prac")
-  .aggregate(practice, actorImpl)
+  .aggregate(practice, supervisor)
 
-lazy val practice = (project in file("practice"))
+lazy val practice = (project in file("modules/practice"))
   .settings(commonSettings("practice"))
-  .dependsOn(actorImpl)
+  .dependsOn(supervisor)
 
-lazy val actorImpl = (project in file("actor-impl"))
-  .settings(commonSettings("actorImpl"))
+lazy val supervisor = (project in file("modules/supervisor"))
+  .settings(commonSettings("supervisor"))
 

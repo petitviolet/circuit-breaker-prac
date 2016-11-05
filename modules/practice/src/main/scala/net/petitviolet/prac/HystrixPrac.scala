@@ -1,9 +1,9 @@
 package net.petitviolet.prac
 
-import java.util.concurrent.{Future => jFuture}
+import java.util.concurrent.{ Future => jFuture }
 
 import com.netflix.hystrix.strategy.concurrency.HystrixRequestContext
-import com.netflix.hystrix.{HystrixCommand, HystrixCommandGroupKey}
+import com.netflix.hystrix.{ HystrixCommand, HystrixCommandGroupKey }
 import rx.Observable
 import rx.functions.Action1
 
@@ -21,7 +21,7 @@ private object HystrixPrac extends App {
   val result2: jFuture[Result] = new UnstableCommand(1001).queue()
   try {
     println(s"result2: ${result2.get()}")
-  } catch { case t: Throwable => println(s"result2 fail: $t")}
+  } catch { case t: Throwable => println(s"result2 fail: $t") }
   println(s"Time 2: ${System.currentTimeMillis() - start}")
 
   // async execute, with Observable
@@ -65,18 +65,18 @@ import net.petitviolet.prac.UnstableCommand._
 private class UnstableCommand(sleepMillis: Long) extends HystrixCommand[Result](key) {
   /**
    * will be invoked on { execute, queue, observe }
- *
+   *
    * @return
    */
   override protected def run(): Result = {
     Thread.sleep(sleepMillis)
-    if (sleepMillis > 1000) { sys.error("Failed to run()")}
+    if (sleepMillis > 1000) { sys.error("Failed to run()") }
     Result(s"Command: $sleepMillis")
   }
 
   /**
    * fallback value for when `run` failed
- *
+   *
    * @return
    */
   override protected def getFallback: Result = {
@@ -86,7 +86,7 @@ private class UnstableCommand(sleepMillis: Long) extends HystrixCommand[Result](
   /**
    * cache key
    * [[HystrixCommand]] is enabled to cache result of `run`
- *
+   *
    * @return
    */
   override protected def getCacheKey: String = sleepMillis.toString

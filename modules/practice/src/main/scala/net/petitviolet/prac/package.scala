@@ -1,7 +1,8 @@
 package net.petitviolet
 
-import akka.actor.{ActorLogging, Actor}
+import akka.actor.{ ActorLogging, Actor }
 import akka.util.Timeout
+
 import scala.concurrent.duration._
 
 package object prac {

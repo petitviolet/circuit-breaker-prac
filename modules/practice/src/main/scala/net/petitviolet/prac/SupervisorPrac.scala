@@ -2,13 +2,12 @@ package net.petitviolet.prac
 
 import java.util.concurrent.ForkJoinPool
 
-import akka.actor.{Props, ActorSystem}
+import akka.actor.{ Props, ActorSystem }
 import akka.pattern.ask
 import com.typesafe.config.ConfigFactory
-import net.petitviolet.akka.supervisor._
+import net.petitviolet.supervisor._
 
 import scala.concurrent.ExecutionContext
-
 
 object SupervisorPrac extends App {
   implicit val system = ActorSystem(s"SupervisorPrac")

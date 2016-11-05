@@ -1,17 +1,17 @@
-package net.petitviolet.akka.supervisor
+package net.petitviolet.supervisor
 
 //package supervisor
 
-import java.util.concurrent.{ForkJoinPool, TimeUnit}
+import java.util.concurrent.{ ForkJoinPool, TimeUnit }
 
 import akka.actor.SupervisorStrategy.Stop
 import akka.actor._
 import com.typesafe.config.Config
-import net.petitviolet.akka.supervisor.ExecutorActor._
-import net.petitviolet.akka.supervisor.Supervisor._
+import net.petitviolet.supervisor.ExecutorActor._
+import net.petitviolet.supervisor.Supervisor._
 
-import scala.concurrent.duration.{Duration, FiniteDuration}
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.{ Duration, FiniteDuration }
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.language.implicitConversions
 
 private sealed trait State
@@ -28,7 +28,7 @@ case class Execute[T](run: Future[T]) extends ExecuteMessage[T]
 case class ExecuteWithFallback[T](run: Future[T], fallback: T) extends ExecuteMessage[T]
 
 object Supervisor {
-  case class MessageOnOpenException private[akka] (msg: String) extends RuntimeException(msg)
+  case class MessageOnOpenException private[supervisor] (msg: String) extends RuntimeException(msg)
 
   def props[T](config: Config): Props =
     Props(classOf[Supervisor[T]], maxFailCount(config), runTimeout(config), resetWait(config))
@@ -40,12 +40,12 @@ object Supervisor {
   private def runTimeout(config: Config): FiniteDuration = Duration(config.getLong("run-timeout"), TimeUnit.MILLISECONDS)
   private def resetWait(config: Config): FiniteDuration = Duration(config.getLong("reset-wait"), TimeUnit.MILLISECONDS)
 
-  private[akka] case object BecomeHalfOpen
+  private[supervisor] case object BecomeHalfOpen
 }
 
-final class Supervisor[T] private(maxFailCount: Int,
-                                  runTimeout: FiniteDuration,
-                                  resetWait: FiniteDuration) extends Actor with ActorLogging {
+final class Supervisor[T] private (maxFailCount: Int,
+                                   runTimeout: FiniteDuration,
+                                   resetWait: FiniteDuration) extends Actor with ActorLogging {
   private var failedCount = 0
   private var state: State = Close
 
@@ -115,7 +115,6 @@ final class Supervisor[T] private(maxFailCount: Int,
 
   private def buildChildExecutorActor(message: ExecuteMessage[T]): ActorRef =
     context actorOf ExecutorActor.props(sender, message, runTimeout)
-
 
   /**
    * not send Message to child actor, just return Exception to the caller

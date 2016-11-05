@@ -1,19 +1,19 @@
-package net.petitviolet.akka.supervisor
+package net.petitviolet.supervisor
 
 import akka.actor._
-import net.petitviolet.akka.supervisor.ExecutorActor._
+import net.petitviolet.supervisor.ExecutorActor._
 
 import scala.concurrent.Await
 import scala.concurrent.duration.FiniteDuration
 import scala.language.implicitConversions
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
 /**
  * Internal API
  */
 private[supervisor] class ExecutorActor[T](originalSender: ActorRef,
-                               message: ExecuteMessage[T],
-                               timeout: FiniteDuration) extends Actor with ActorLogging {
+                                           message: ExecuteMessage[T],
+                                           timeout: FiniteDuration) extends Actor with ActorLogging {
   override def receive: Actor.Receive = {
     case Run =>
       log.debug(s"ExecutorActor: $message")
@@ -47,5 +47,4 @@ private[supervisor] object ExecutorActor {
   def props[T](originalSender: ActorRef, execute: ExecuteMessage[T], timeout: FiniteDuration): Props =
     Props(classOf[ExecutorActor[T]], originalSender, execute, timeout)
 }
-
 
