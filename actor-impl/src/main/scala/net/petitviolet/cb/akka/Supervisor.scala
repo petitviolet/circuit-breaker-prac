@@ -1,16 +1,16 @@
 package net.petitviolet.cb.akka
 
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.{ForkJoinPool, TimeUnit}
 
 import akka.actor.Actor.Receive
 import akka.actor.SupervisorStrategy.{Stop, Restart}
 import akka.actor._
 import akka.pattern.ask
 import com.typesafe.config.{ConfigFactory, Config}
-import net.petitviolet.cb.akka.ExecutorActor.{ChildResult, Run}
-import net.petitviolet.cb.akka.Supervisor.MessageOnOpenException
+import net.petitviolet.cb.akka.ExecutorActor.{ChildFailure, ChildSuccess, Run}
+import net.petitviolet.cb.akka.Supervisor.{BecomeHalfOpen, MessageOnOpenException}
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{ExecutionContext, Await, Future}
 import scala.concurrent.duration.{FiniteDuration, Duration}
 import scala.language.implicitConversions
 import scala.util.{Try, Failure, Success}
@@ -42,6 +42,8 @@ object Supervisor {
   private def maxFailCount(config: Config): Int = config.getInt("max-fail-count")
   private def runTimeout(config: Config): FiniteDuration = Duration(config.getLong("run-timeout"), TimeUnit.MILLISECONDS)
   private def resetWait(config: Config): FiniteDuration = Duration(config.getLong("reset-wait"), TimeUnit.MILLISECONDS)
+
+  private[akka] case object BecomeHalfOpen
 }
 
 final class Supervisor[T] private(maxFailCount: Int,
@@ -57,17 +59,22 @@ final class Supervisor[T] private(maxFailCount: Int,
     case _: ActorKilledException         => Stop
     case _: DeathPactException           => Stop
     case t: Throwable =>
-      if (this.state == HalfOpen) {
-        // failed messaging on HalfOpen...
+      onReceiveFailure(t)
+      Stop
+  }
+
+  private def onReceiveFailure(t: Throwable): Unit = {
+    log.debug(s"ReceiveFailure. state: $state, cause: $t")
+    if (this.state == HalfOpen) {
+      // failed messaging on HalfOpen...
+      becomeOpen()
+    } else {
+      failedCount += 1
+      if (failedCount >= maxFailCount) {
+        failedCount = 0
         becomeOpen()
-      } else {
-        failedCount += 1
-        if (failedCount >= maxFailCount) {
-          failedCount = 0
-          becomeOpen()
-        }
       }
-      Restart
+    }
   }
 
   private def becomeClose() = {
@@ -75,8 +82,6 @@ final class Supervisor[T] private(maxFailCount: Int,
     this.state = Close
     context.become(sendToChild)
   }
-
-  private case object BecomeHalfOpen
 
   private def becomeHalfOpen() = {
     log.info(s"state: $state => HalfOpen")
@@ -89,7 +94,7 @@ final class Supervisor[T] private(maxFailCount: Int,
     this.state = Open
     context.become(responseException)
     // schedule to become `HalfOpen` state after defined `resetWait`.
-    context.system.scheduler.scheduleOnce(resetWait, self, BecomeHalfOpen)(context.dispatcher)
+    context.system.scheduler.scheduleOnce(resetWait, self, BecomeHalfOpen)(ExecutionContext.fromExecutor(new ForkJoinPool(1)))
   }
 
   /**
@@ -97,25 +102,18 @@ final class Supervisor[T] private(maxFailCount: Int,
    * Only `Close` or `HalfOpen` state.
    */
   private def sendToChild: Receive = {
-    case BecomeHalfOpen =>
-      if (this.state == Open) {
-        becomeHalfOpen()
-      }
     case message: ExecuteMessage[T] =>
       // if fail, catch on `supervisorStrategy`
       log.info(s"state: $state, message: $message")
       buildChildExecutorActor(message) ! Run
-    case ChildResult(originalSender, result) =>
+    case ChildSuccess(originalSender, result) =>
       log.info(s"state: $state, result: $result")
-      if (this.state == HalfOpen) {
-        log.info(s"----------------------------")
-        becomeClose()
-      } else {
-        log.info(s"***************************")
-
-      }
+      if (this.state == HalfOpen) becomeClose()
       // response from `ExecuteActor`, proxy to originalSender
       originalSender ! result
+    case ChildFailure(originalSender, t) =>
+      onReceiveFailure(t)
+      originalSender ! Status.Failure(t)
   }
 
   private def buildChildExecutorActor(message: ExecuteMessage[T]): ActorRef =
@@ -127,14 +125,21 @@ final class Supervisor[T] private(maxFailCount: Int,
    * Only `Open` state.
    */
   private def responseException: Receive = {
+    case BecomeHalfOpen =>
+      if (this.state == Open) {
+        becomeHalfOpen()
+      }
     case Execute(run) =>
       log.debug(s"state: $state, received: $Execute")
-      throw new MessageOnOpenException(s"receive on `Open` state")
-    case ChildResult(originalSender, result) =>
+      sender ! Status.Failure(new MessageOnOpenException(s"receive on `Open` state"))
+    case ChildSuccess(originalSender, result) =>
       log.debug(s"state: $state, result: $result")
       if (this.state == HalfOpen) becomeClose()
       // response from `ExecuteActor`, proxy to originalSender
       originalSender ! result
+    case ChildFailure(originalSender, t) =>
+      onReceiveFailure(t)
+      originalSender ! Status.Failure(t)
   }
 }
 
@@ -149,13 +154,20 @@ private class ExecutorActor[T](originalSender: ActorRef,
       log.debug(s"ExecutorActor: $message")
       val resultTry: Try[T] = Try { Await.result(message.run, timeout) }
       resultTry match {
-        case Success(result) => originalSender ! ChildResult(originalSender, result)
+        case Success(result) =>
+          respondToParent(originalSender, result)
         case Failure(t) =>
           message match {
-            case ExecuteWithFallback(_, fallback) => originalSender ! ChildResult(originalSender, fallback)
-            case _ => throw t
+            case ExecuteWithFallback(_, fallback) =>
+              respondToParent(originalSender, fallback)
+            case _ =>
+              sender ! ChildFailure(originalSender, t)
           }
       }
+  }
+
+  private def respondToParent(originalSender: ActorRef, result: T) = {
+    sender() ! ChildSuccess(originalSender, result)
   }
 }
 
@@ -164,7 +176,8 @@ private class ExecutorActor[T](originalSender: ActorRef,
  */
 private object ExecutorActor {
   object Run
-  case class ChildResult[T](originalSender: ActorRef, result: T)
+  case class ChildSuccess[T](originalSender: ActorRef, result: T)
+  case class ChildFailure(originalSender: ActorRef, cause: Throwable)
 
   def props[T](originalSender: ActorRef, execute: ExecuteMessage[T], timeout: FiniteDuration): Props =
     Props(classOf[ExecutorActor[T]], originalSender, execute, timeout)
