@@ -6,7 +6,7 @@ lazy val commonDependencies = Seq(
 
 //  "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
 
-  "org.scalatest" %% "scalatest" % "2.2.4" % "test"
+  "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test"
 ) ++ logDependencies
 
 lazy val logDependencies = Seq(
@@ -17,7 +17,7 @@ lazy val logDependencies = Seq(
 
 def commonSettings(projectName: String) = Seq(
   name := projectName,
-  scalaVersion := "2.11.8",
+  scalaVersion := "2.12.0",
   version := "1.0",
   libraryDependencies := commonDependencies
 )
