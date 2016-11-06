@@ -16,7 +16,12 @@ object SupervisorPrac extends App {
 
   val config = ConfigFactory.load().getConfig("supervisor")
 
-  val supervisorActor = system.actorOf(Supervisor.props(config))
+  import scala.concurrent.duration._
+  val supervisorActor = system.actorOf(Supervisor.props(
+    maxFailCount = 2,
+    runTimeout = 1000.milliseconds,
+    resetWait = 3000.milliseconds
+  ))
 
   val actorRef = system.actorOf(Props[UnstableActor])
 
