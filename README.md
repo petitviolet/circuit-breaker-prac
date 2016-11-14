@@ -1,12 +1,19 @@
 # Supervisor
 
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/net.petitviolet/supervisor_2.12/badge.svg)](https://maven-badges.herokuapp.com/maven-central/net.petitviolet/supervisor_2.12)
+
 A [circuit-breaker](http://martinfowler.com/bliki/CircuitBreaker.html) implementation with Akka.Actor.
 
 CircuitBreaker provides stability and resilience.
 
 # How to use
 
-not released yet.
+write dependency in your build.sbt.
+
+```
+libraryDependencies += "net.petitviolet" %% "supervisor" % "<latest version>"
+// libraryDependencies += "net.petitviolet" % "supervisor_2.12" % "<latest version>"
+```
 
 # Usage
 

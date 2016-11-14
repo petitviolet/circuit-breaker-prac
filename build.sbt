@@ -1,12 +1,19 @@
 lazy val akkaVersion = "2.4.12"
 
+val VERSION = "0.1.0"
+
+val GROUP_ID = "net.petitviolet"
+
+val PROJECT_NAME = "supervisor"
+
 lazy val commonDependencies = Seq(
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.netflix.hystrix" % "hystrix-core" % "1.5.6",
 
-//  "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
+  "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
 
-  "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test"
+  "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
+  "org.mockito" % "mockito-core" % "1.10.19" % "test"
 ) ++ logDependencies
 
 lazy val logDependencies = Seq(
@@ -18,8 +25,9 @@ lazy val logDependencies = Seq(
 def commonSettings(projectName: String) = Seq(
   name := projectName,
   scalaVersion := "2.12.0",
-  version := "1.0",
-  libraryDependencies := commonDependencies
+  version := VERSION,
+  libraryDependencies := commonDependencies,
+  organization := GROUP_ID
 )
 
 lazy val root = (project in file("."))
@@ -28,8 +36,9 @@ lazy val root = (project in file("."))
 
 lazy val example = (project in file("example"))
   .settings(commonSettings("example"))
-  .dependsOn(supervisor)
+  .settings(libraryDependencies += GROUP_ID %% PROJECT_NAME % VERSION)
+//  .dependsOn(supervisor)
 
-lazy val supervisor = (project in file("supervisor"))
-  .settings(commonSettings("supervisor"))
+lazy val supervisor = (project in file(PROJECT_NAME))
+  .settings(commonSettings(PROJECT_NAME))
 

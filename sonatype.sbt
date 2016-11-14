@@ -1,5 +1,16 @@
 // Your profile name of the sonatype account. The default is the same with the organization value
 sonatypeProfileName := "net.petitviolet"
+organization := "net.petitviolet"
+
+publishMavenStyle := true
+
+publishTo := {
+  val nexus = "https://oss.sonatype.org/"
+  if (isSnapshot.value)
+    Some("snapshots" at nexus + "content/repositories/snapshots")
+  else
+    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+}
 
 // To sync with Maven central, you need to supply the following information:
 pomExtra in Global := {
@@ -18,7 +29,7 @@ pomExtra in Global := {
   <developers>
     <developer>
       <id>net.petitviolet</id>
-      <name>petitviolet</name>
+      <name>Hiroki Komurasaki</name>
       <url>https://www.petitviolet.net</url>
     </developer>
   </developers>
