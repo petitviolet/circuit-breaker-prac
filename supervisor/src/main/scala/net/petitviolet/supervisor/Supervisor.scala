@@ -6,6 +6,7 @@ import java.util.concurrent.{ ForkJoinPool, TimeUnit }
 
 import akka.actor.SupervisorStrategy.Stop
 import akka.actor._
+import akka.util.Timeout
 import com.typesafe.config.Config
 import net.petitviolet.supervisor.ExecutorActor._
 import net.petitviolet.supervisor.Supervisor._
@@ -13,6 +14,7 @@ import net.petitviolet.supervisor.Supervisor._
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.language.implicitConversions
+import scala.reflect.ClassTag
 
 private sealed trait State
 private case object Close extends State
@@ -41,6 +43,16 @@ object Supervisor {
   private def resetWait(config: Config): FiniteDuration = Duration(config.getLong("reset-wait"), TimeUnit.MILLISECONDS)
 
   private[supervisor] case object BecomeHalfOpen
+
+  implicit class SupervisorActor(val actorRef: ActorRef) extends AnyVal {
+    import akka.pattern.ask
+    import scala.concurrent.duration._
+    implicit def timeout: Timeout = Timeout(21474835.seconds) // maximum timeout for default
+
+    def supervise[T](future: Future[T])(implicit ec: ExecutionContext, classTag: ClassTag[T]): Future[T] = {
+      (actorRef ? Execute(future)).mapTo[T]
+    }
+  }
 }
 
 final class Supervisor[T] private (maxFailCount: Int,
