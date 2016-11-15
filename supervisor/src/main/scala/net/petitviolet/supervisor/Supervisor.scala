@@ -75,19 +75,19 @@ final class Supervisor[T] private (maxFailCount: Int,
   }
 
   private def becomeClose() = {
-    log.info(s"state: $state => Close")
+    log.debug(s"state: $state => Close")
     this.state = Close
     context.become(sendToChild)
   }
 
   private def becomeHalfOpen() = {
-    log.info(s"state: $state => HalfOpen")
+    log.debug(s"state: $state => HalfOpen")
     this.state = HalfOpen
     context.become(sendToChild)
   }
 
   private def becomeOpen() = {
-    log.info(s"state: $state => Open")
+    log.debug(s"state: $state => Open")
     this.state = Open
     context.become(responseException)
     // schedule to become `HalfOpen` state after defined `resetWait`.
@@ -101,10 +101,10 @@ final class Supervisor[T] private (maxFailCount: Int,
   private def sendToChild: Receive = {
     case message: ExecuteMessage[T] =>
       // if fail, catch on `supervisorStrategy`
-      log.info(s"state: $state, message: $message")
+      log.debug(s"state: $state, message: $message")
       buildChildExecutorActor(message) ! Run
     case ChildSuccess(originalSender, result) =>
-      log.info(s"state: $state, result: $result")
+      log.debug(s"state: $state, result: $result")
       if (this.state == HalfOpen) becomeClose()
       // response from `ExecuteActor`, proxy to originalSender
       originalSender ! result
