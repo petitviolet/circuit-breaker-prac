@@ -84,7 +84,6 @@ final class Supervisor[T] private (maxFailCount: Int,
       case Close =>
         failedCount += 1
         if (failedCount >= maxFailCount) {
-          failedCount = 0
           becomeOpen()
         }
       case Open | HalfOpen =>
@@ -95,6 +94,7 @@ final class Supervisor[T] private (maxFailCount: Int,
 
   private def internalBecome(_state: State, _receive: Receive) = {
     log.debug(s"state: $state => ${_state}")
+    this.failedCount = 0
     this.state = _state
     context.become(_receive)
   }
