@@ -12,7 +12,7 @@ import net.petitviolet.supervisor.ExecutorActor._
 import net.petitviolet.supervisor.Supervisor._
 
 import scala.concurrent.duration.{ Duration, FiniteDuration }
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ ExecutionContextExecutor, ExecutionContext, Future }
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 
@@ -52,6 +52,10 @@ object Supervisor {
     def supervise[T](future: Future[T])(implicit ec: ExecutionContext, classTag: ClassTag[T]): Future[T] = {
       (actorRef ? Execute(future)).mapTo[T]
     }
+
+    def supervise[T](future: Future[T], sender: ActorRef)(implicit ec: ExecutionContext, classTag: ClassTag[T]): Future[T] = {
+      actorRef.ask(Execute(future))(timeout, sender).mapTo[T]
+    }
   }
 }
 
@@ -60,6 +64,8 @@ final class Supervisor[T] private (maxFailCount: Int,
                                    resetWait: FiniteDuration) extends Actor with ActorLogging {
   private var failedCount = 0
   private var state: State = Close
+  private lazy val threadPool: ExecutionContext = ExecutionContext.fromExecutor(new ForkJoinPool(1))
+  private var timerToHalfOpen: Option[Cancellable] = None
 
   override def receive: Receive = sendToChild
 
@@ -74,36 +80,34 @@ final class Supervisor[T] private (maxFailCount: Int,
 
   private def onReceiveFailure(t: Throwable): Unit = {
     log.debug(s"ReceiveFailure. state: $state, cause: $t")
-    if (this.state == HalfOpen) {
-      // failed messaging on HalfOpen...
-      becomeOpen()
-    } else {
-      failedCount += 1
-      if (failedCount >= maxFailCount) {
-        failedCount = 0
+    this.state match {
+      case Close =>
+        failedCount += 1
+        if (failedCount >= maxFailCount) {
+          failedCount = 0
+          becomeOpen()
+        }
+      case Open | HalfOpen =>
+        // re-fail on Open or failed messaging on HalfOpen...
         becomeOpen()
-      }
     }
   }
 
-  private def becomeClose() = {
-    log.debug(s"state: $state => Close")
-    this.state = Close
-    context.become(sendToChild)
+  private def internalBecome(_state: State, _receive: Receive) = {
+    log.debug(s"state: $state => ${_state}")
+    this.state = _state
+    context.become(_receive)
   }
 
-  private def becomeHalfOpen() = {
-    log.debug(s"state: $state => HalfOpen")
-    this.state = HalfOpen
-    context.become(sendToChild)
-  }
+  private def becomeClose() = internalBecome(Close, sendToChild)
+
+  private def becomeHalfOpen() = internalBecome(HalfOpen, sendToChild)
 
   private def becomeOpen() = {
-    log.debug(s"state: $state => Open")
-    this.state = Open
-    context.become(responseException)
+    internalBecome(Open, responseException)
     // schedule to become `HalfOpen` state after defined `resetWait`.
-    context.system.scheduler.scheduleOnce(resetWait, self, BecomeHalfOpen)(ExecutionContext.fromExecutor(new ForkJoinPool(1)))
+    this.timerToHalfOpen.map { _.cancel() }
+    this.timerToHalfOpen = Some(context.system.scheduler.scheduleOnce(resetWait, self, BecomeHalfOpen)(threadPool))
   }
 
   /**

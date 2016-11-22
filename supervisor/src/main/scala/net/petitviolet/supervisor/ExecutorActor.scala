@@ -17,22 +17,25 @@ private[supervisor] class ExecutorActor[T](originalSender: ActorRef,
   override def receive: Actor.Receive = {
     case Run =>
       log.debug(s"ExecutorActor: $message")
-      val resultTry: Try[T] = Try { Await.result(message.run, timeout) }
-      resultTry match {
+      Try { Await.result(message.run, timeout) } match {
         case Success(result) =>
-          respondToParent(originalSender, result)
+          respondSuccessToParent(originalSender, result)
         case Failure(t) =>
           message match {
             case ExecuteWithFallback(_, fallback) =>
-              respondToParent(originalSender, fallback)
+              respondSuccessToParent(originalSender, fallback)
             case _ =>
-              sender ! ChildFailure(originalSender, t)
+              respondFailureToParent(originalSender, t)
           }
       }
   }
 
-  private def respondToParent(originalSender: ActorRef, result: T) = {
+  private def respondSuccessToParent(originalSender: ActorRef, result: T) = {
     sender() ! ChildSuccess(originalSender, result)
+  }
+
+  private def respondFailureToParent(originalSender: ActorRef, cause: Throwable) = {
+    sender() ! ChildFailure(originalSender, cause)
   }
 }
 
