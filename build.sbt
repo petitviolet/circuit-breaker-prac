@@ -12,7 +12,7 @@ lazy val commonDependencies = Seq(
 
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
 
-  "org.scalatest" %% "scalatest" % "3.0.0" % "test",
+  "org.scalatest" %% "scalatest" % "3.0.1" % "test",
   "org.mockito" % "mockito-core" % "1.10.19" % "test"
 ) ++ logDependencies
 
@@ -41,5 +41,8 @@ lazy val example = (project in file("example"))
 
 lazy val supervisor = (project in file(PROJECT_NAME))
   .settings(commonSettings(PROJECT_NAME))
-  .settings(fork in Test := false)
+//  .settings(fork in Test := false)
+//  .settings(testForkedParallel in Test := false)
+//  .settings(parallelExecution in Test := false)
+
 
