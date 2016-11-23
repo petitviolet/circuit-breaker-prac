@@ -1,0 +1,24 @@
+# scoverageのレポートを保存するよう設定
+machine:
+  timezone:
+    Asia/Tokyo
+  java:
+    version: oraclejdk8
+
+general:
+  artifacts:
+    - "supervisor/target/*/scoverage-report"
+
+# テスト準備コマンドを上書きしてScoverageに対応させる
+dependencies:
+  override:
+    - "sbt 'project supervisor' clean update compile"
+  cache_directories:
+    - "~/.sbt/boot"
+
+test:
+  override:
+    - "sbt 'project supervisor' clean coverage test"
+  # post:
+    # - "sbt 'project supervisor' coveralls" # テスト終了後COVERALLSに結果送信
+

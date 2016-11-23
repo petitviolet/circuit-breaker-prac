@@ -26,7 +26,7 @@ def commonSettings(projectName: String) = Seq(
   name := projectName,
   scalaVersion := "2.12.0",
   version := VERSION,
-  libraryDependencies := commonDependencies,
+  libraryDependencies ++= commonDependencies,
   organization := GROUP_ID
 )
 
@@ -41,8 +41,10 @@ lazy val example = (project in file("example"))
 
 lazy val supervisor = (project in file(PROJECT_NAME))
   .settings(commonSettings(PROJECT_NAME))
+  .settings(testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-u", {val dir = System.getenv("CI_REPORTS"); if(dir == null) "target/reports" else dir} ))
 //  .settings(fork in Test := false)
 //  .settings(testForkedParallel in Test := false)
 //  .settings(parallelExecution in Test := false)
+
 
 

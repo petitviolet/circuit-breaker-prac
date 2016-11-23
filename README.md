@@ -1,6 +1,7 @@
 # Supervisor
 
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/net.petitviolet/supervisor_2.12/badge.svg)](https://maven-badges.herokuapp.com/maven-central/net.petitviolet/supervisor_2.12)
+[![CircleCI](https://circleci.com/gh/petitviolet/supervisor/tree/master.svg?style=svg)](https://circleci.com/gh/petitviolet/supervisor/tree/master)
 
 A [circuit-breaker](http://martinfowler.com/bliki/CircuitBreaker.html) implementation with Akka.Actor.
 
