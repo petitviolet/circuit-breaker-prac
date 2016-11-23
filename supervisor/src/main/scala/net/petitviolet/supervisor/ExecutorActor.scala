@@ -11,9 +11,9 @@ import scala.util.{ Failure, Success, Try }
 /**
  * Internal API
  */
-private[supervisor] class ExecutorActor[T](originalSender: ActorRef,
-                                           message: ExecuteMessage[T],
-                                           timeout: FiniteDuration) extends Actor with ActorLogging {
+private[supervisor] class ExecutorActor[T] private (originalSender: ActorRef,
+                                                    message: ExecuteMessage[T],
+                                                    timeout: FiniteDuration) extends Actor with ActorLogging {
   override def receive: Actor.Receive = {
     case Run =>
       log.debug(s"ExecutorActor: $message")
@@ -47,7 +47,7 @@ private[supervisor] object ExecutorActor {
   case class ChildSuccess[T](originalSender: ActorRef, result: T)
   case class ChildFailure(originalSender: ActorRef, cause: Throwable)
 
-  def props[T](originalSender: ActorRef, execute: ExecuteMessage[T], timeout: FiniteDuration): Props =
-    Props(classOf[ExecutorActor[T]], originalSender, execute, timeout)
+  def props[T](originalSender: ActorRef, message: ExecuteMessage[T], timeout: FiniteDuration): Props =
+    Props(classOf[ExecutorActor[T]], originalSender, message, timeout)
 }
 

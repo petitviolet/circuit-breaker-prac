@@ -2,7 +2,7 @@ package net.petitviolet.supervisor
 
 //package supervisor
 
-import java.util.concurrent.{ ForkJoinPool, TimeUnit }
+import java.util.concurrent.{ Executors, ForkJoinPool, TimeUnit }
 
 import akka.actor.SupervisorStrategy.Stop
 import akka.actor._
@@ -12,14 +12,14 @@ import net.petitviolet.supervisor.ExecutorActor._
 import net.petitviolet.supervisor.Supervisor._
 
 import scala.concurrent.duration.{ Duration, FiniteDuration }
-import scala.concurrent.{ ExecutionContextExecutor, ExecutionContext, Future }
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 
-private sealed trait State
-private case object Close extends State
-private case object HalfOpen extends State
-private case object Open extends State
+private[supervisor] sealed trait State
+private[supervisor] case object Close extends State
+private[supervisor] case object HalfOpen extends State
+private[supervisor] case object Open extends State
 
 sealed trait ExecuteMessage[T] {
   val run: Future[T]
@@ -30,7 +30,7 @@ case class Execute[T](run: Future[T]) extends ExecuteMessage[T]
 case class ExecuteWithFallback[T](run: Future[T], fallback: T) extends ExecuteMessage[T]
 
 object Supervisor {
-  case class MessageOnOpenException private[supervisor] (msg: String) extends RuntimeException(msg)
+  case object MessageOnOpenException extends RuntimeException("message on `Open`")
 
   def props[T](config: Config): Props =
     Props(classOf[Supervisor[T]], maxFailCount(config), runTimeout(config), resetWait(config))
@@ -46,6 +46,7 @@ object Supervisor {
 
   implicit class SupervisorActor(val actorRef: ActorRef) extends AnyVal {
     import akka.pattern.ask
+
     import scala.concurrent.duration._
     implicit def timeout: Timeout = Timeout(21474835.seconds) // maximum timeout for default
 
@@ -62,10 +63,10 @@ object Supervisor {
 final class Supervisor[T] private (maxFailCount: Int,
                                    runTimeout: FiniteDuration,
                                    resetWait: FiniteDuration) extends Actor with ActorLogging {
-  private var failedCount = 0
-  private var state: State = Close
-  private lazy val threadPool: ExecutionContext = ExecutionContext.fromExecutor(new ForkJoinPool(1))
-  private var timerToHalfOpen: Option[Cancellable] = None
+  private[supervisor] var failedCount = 0
+  private[supervisor] var state: State = Close
+  private[supervisor] def threadPool: ExecutionContext = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
+  private[supervisor] var timerToHalfOpen: Option[Cancellable] = None
 
   override def receive: Receive = sendToChild
 
@@ -78,7 +79,7 @@ final class Supervisor[T] private (maxFailCount: Int,
       Stop
   }
 
-  private def onReceiveFailure(t: Throwable): Unit = {
+  private[this] def onReceiveFailure(t: Throwable): Unit = {
     log.debug(s"ReceiveFailure. state: $state, cause: $t")
     this.state match {
       case Close =>
@@ -92,63 +93,63 @@ final class Supervisor[T] private (maxFailCount: Int,
     }
   }
 
-  private def internalBecome(_state: State, _receive: Receive) = {
+  private[this] def internalBecome(_state: State, _receive: Receive) = {
     log.debug(s"state: $state => ${_state}")
     this.failedCount = 0
     this.state = _state
     context.become(_receive)
   }
 
-  private def becomeClose() = internalBecome(Close, sendToChild)
+  private[supervisor] def becomeClose() = internalBecome(Close, sendToChild)
 
-  private def becomeHalfOpen() = internalBecome(HalfOpen, sendToChild)
+  private[supervisor] def becomeHalfOpen() = internalBecome(HalfOpen, sendToChild)
 
-  private def becomeOpen() = {
-    internalBecome(Open, responseException)
+  private[supervisor] def becomeOpen() = {
     // schedule to become `HalfOpen` state after defined `resetWait`.
     this.timerToHalfOpen.map { _.cancel() }
     this.timerToHalfOpen = Some(context.system.scheduler.scheduleOnce(resetWait, self, BecomeHalfOpen)(threadPool))
+    internalBecome(Open, responseException)
   }
 
   /**
    * send Message to child actor and receive message from the actor, proxy its result to the caller.
    * Only `Close` or `HalfOpen` state.
    */
-  private def sendToChild: Receive = {
+  private[this] def sendToChild: Receive = {
     case message: ExecuteMessage[T] =>
       // if fail, catch on `supervisorStrategy`
       log.debug(s"state: $state, message: $message")
       buildChildExecutorActor(message) ! Run
     case ChildSuccess(originalSender, result) =>
       log.debug(s"state: $state, result: $result")
-      if (this.state == HalfOpen) becomeClose()
+      if (this.state == HalfOpen) {
+        becomeClose()
+      }
       // response from `ExecuteActor`, proxy to originalSender
-      originalSender ! result
+      originalSender ! Status.Success(result)
     case ChildFailure(originalSender, t) =>
       onReceiveFailure(t)
       originalSender ! Status.Failure(t)
   }
 
-  private def buildChildExecutorActor(message: ExecuteMessage[T]): ActorRef =
+  private[this] def buildChildExecutorActor(message: ExecuteMessage[T]): ActorRef =
     context actorOf ExecutorActor.props(sender, message, runTimeout)
 
   /**
    * not send Message to child actor, just return Exception to the caller
    * Only `Open` state.
    */
-  private def responseException: Receive = {
-    case BecomeHalfOpen =>
-      if (this.state == Open) {
-        becomeHalfOpen()
-      }
-    case Execute(run) =>
-      log.debug(s"state: $state, received: $Execute")
-      sender ! Status.Failure(new MessageOnOpenException(s"receive on `Open` state"))
+  private[this] def responseException: Receive = {
+    case BecomeHalfOpen if this.state == Open =>
+      becomeHalfOpen()
+    case message: Execute[_] =>
+      log.debug(s"state: $state, received: $message")
+      sender ! Status.Failure(MessageOnOpenException)
     case ChildSuccess(originalSender, result) =>
       log.debug(s"state: $state, result: $result")
       if (this.state == HalfOpen) becomeClose()
       // response from `ExecuteActor`, proxy to originalSender
-      originalSender ! result
+      originalSender ! Status.Success(result)
     case ChildFailure(originalSender, t) =>
       onReceiveFailure(t)
       originalSender ! Status.Failure(t)
