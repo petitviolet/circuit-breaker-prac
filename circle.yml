@@ -12,13 +12,14 @@ general:
 # テスト準備コマンドを上書きしてScoverageに対応させる
 dependencies:
   override:
-    - "sbt 'project supervisor' clean update compile"
+    - "sbt 'project supervisor' clean coverage test coverageReport"
+
   cache_directories:
     - "~/.sbt/boot"
 
 test:
   override:
     - "sbt 'project supervisor' clean coverage test"
-  # post:
-    # - "sbt 'project supervisor' coveralls" # テスト終了後COVERALLSに結果送信
+  post:
+    - "sbt 'project supervisor' coverageAggregate && sbt 'project supervisor' coveralls"
 

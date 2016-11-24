@@ -26,12 +26,9 @@ private object HystrixPrac extends App {
 
   // async execute, with Observable
   val result3: Observable[Result] = new UnstableCommand(800).observe()
-  result3.subscribe {
-    new Action1[Result] {
-      override def call(t: Result): Unit = {
-        println(s"result3: $t")
-        println(s"Time 3: ${System.currentTimeMillis() - start}")
-      }
+  result3.subscribe { (t: Result) => { // SAM!!! Scala2.12!!!
+      println(s"result3: $t")
+      println(s"Time 3: ${System.currentTimeMillis() - start}")
     }
   }
 
