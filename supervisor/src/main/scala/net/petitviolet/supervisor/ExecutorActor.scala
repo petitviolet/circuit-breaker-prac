@@ -17,13 +17,13 @@ private[supervisor] class ExecutorActor[T] private (originalSender: ActorRef,
   override def receive: Actor.Receive = {
     case Run =>
       log.debug(s"ExecutorActor: $message")
-      Try { Await.result(message.run, timeout) } match {
+      Try { Await.result(message.run.apply, timeout) } match {
         case Success(result) =>
           respondSuccessToParent(originalSender, result)
         case Failure(t) =>
           message match {
             case ExecuteWithFallback(_, fallback) =>
-              respondSuccessToParent(originalSender, fallback)
+              respondSuccessToParent(originalSender, fallback.apply)
             case _ =>
               respondFailureToParent(originalSender, t)
           }

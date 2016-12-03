@@ -8,6 +8,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 object AkkaCircuitBreakerPrac extends App {
+
   implicit val system = ActorSystem(s"AkkaCircuitBreakerPrac")
   implicit val dispatcher: ExecutionContext = ExecutionContext.Implicits.global
 

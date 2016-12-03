@@ -8,7 +8,8 @@ import com.typesafe.config.ConfigFactory
 import net.petitviolet.ex.common._
 import net.petitviolet.supervisor._
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ Future, ExecutionContext }
+import scala.util.{ Random, Failure, Success }
 
 object SupervisorPrac extends App {
   implicit val system = ActorSystem(s"SupervisorPrac")
@@ -24,9 +25,13 @@ object SupervisorPrac extends App {
   ))
 
   val actorRef = system.actorOf(Props[UnstableActor])
+  val future = Future.apply { val i = Random.nextInt(2000); Thread.sleep(i); i }
 
   // state is close
-  supervisorActor ? Execute(actorRef ? Message("1")) onComplete { case x => println(s"result =>$x") }
+  supervisorActor ? Execute(future) onComplete {
+    case Success(x) => println(s"success => $x")
+    case Failure(t) => println(s"fail => $t")
+  }
   supervisorActor ? Execute(actorRef ? Message("2")) onComplete { case x => println(s"result =>$x") }
 
   // failure once

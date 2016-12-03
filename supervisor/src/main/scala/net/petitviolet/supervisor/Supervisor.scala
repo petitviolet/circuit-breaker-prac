@@ -22,12 +22,24 @@ private[supervisor] case object HalfOpen extends State
 private[supervisor] case object Open extends State
 
 sealed trait ExecuteMessage[T] {
-  val run: Future[T]
+  val run: () => Future[T]
 }
 
-case class Execute[T](run: Future[T]) extends ExecuteMessage[T]
+class Execute[T](val run: () => Future[T]) extends ExecuteMessage[T]
 
-case class ExecuteWithFallback[T](run: Future[T], fallback: T) extends ExecuteMessage[T]
+class ExecuteWithFallback[T](val run: () => Future[T], val fallback: () => T) extends ExecuteMessage[T]
+
+object Execute {
+  def apply[T](run: => Future[T]): Execute[T] = new Execute(() => run)
+
+  def unapply[T](execute: Execute[T]): Option[() => Future[T]] = Some(execute.run)
+}
+
+object ExecuteWithFallback {
+  def apply[T](run: => Future[T], fallback: => T): ExecuteWithFallback[T] = new ExecuteWithFallback(() => run, () => fallback)
+
+  def unapply[T](execute: ExecuteWithFallback[T]): Option[(() => Future[T], () => T)] = Some(execute.run, execute.fallback)
+}
 
 object Supervisor {
   case object MessageOnOpenException extends RuntimeException("message on `Open`")
@@ -49,16 +61,17 @@ object Supervisor {
 
     import scala.concurrent.duration._
     implicit def timeout: Timeout = Timeout(21474835.seconds) // maximum timeout for default
+    private implicit def toFunction[T](any: T): () => T = () => any
 
-    def supervise[T](future: Future[T], fallback: T)(implicit ec: ExecutionContext, classTag: ClassTag[T]): Future[T] = {
+    def supervise[T](future: => Future[T], fallback: => T)(implicit ec: ExecutionContext, classTag: ClassTag[T]): Future[T] = {
       (actorRef ? ExecuteWithFallback(future, fallback)).mapTo[T]
     }
 
-    def supervise[T](future: Future[T])(implicit ec: ExecutionContext, classTag: ClassTag[T]): Future[T] = {
+    def supervise[T](future: => Future[T])(implicit ec: ExecutionContext, classTag: ClassTag[T]): Future[T] = {
       (actorRef ? Execute(future)).mapTo[T]
     }
 
-    def supervise[T](future: Future[T], sender: ActorRef)(implicit ec: ExecutionContext, classTag: ClassTag[T]): Future[T] = {
+    def supervise[T](future: => Future[T], sender: ActorRef)(implicit ec: ExecutionContext, classTag: ClassTag[T]): Future[T] = {
       actorRef.ask(Execute(future))(timeout, sender).mapTo[T]
     }
   }
