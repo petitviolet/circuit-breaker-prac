@@ -64,6 +64,28 @@ class SupervisorSpec extends SpecBase("supervisor-spec") {
         expectMsg(Failure(FutureException))
       }
     }
+
+    "return fallback value" when {
+      val fallback = 100L
+
+      "failure with failing future" in {
+        val supervisor = buildSupervisorRef()
+        supervisor.receive(ExecuteWithFallback(Future { Thread.sleep((runTimeout * 2).toMillis); 1 }, fallback), testActor)
+        expectMsg(Success(fallback))
+      }
+
+      "given future timeouts with implicit conversion" in {
+        val supervisor = buildSupervisorRef()
+        (supervisor supervise (Future { Thread.sleep((runTimeout * 2).toMillis); 1 }, fallback)).pipeTo(testActor)
+        expectMsg(fallback)
+      }
+
+      "given failed future" in {
+        val supervisor = buildSupervisorRef()
+        supervisor.receive(ExecuteWithFallback(Future.failed(FutureException), fallback), testActor)
+        expectMsg(Success(fallback))
+      }
+    }
   }
 
   "`Close` supervisor's state" must {

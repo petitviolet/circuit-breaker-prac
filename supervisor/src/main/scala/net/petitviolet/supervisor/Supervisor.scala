@@ -50,6 +50,10 @@ object Supervisor {
     import scala.concurrent.duration._
     implicit def timeout: Timeout = Timeout(21474835.seconds) // maximum timeout for default
 
+    def supervise[T](future: Future[T], fallback: T)(implicit ec: ExecutionContext, classTag: ClassTag[T]): Future[T] = {
+      (actorRef ? ExecuteWithFallback(future, fallback)).mapTo[T]
+    }
+
     def supervise[T](future: Future[T])(implicit ec: ExecutionContext, classTag: ClassTag[T]): Future[T] = {
       (actorRef ? Execute(future)).mapTo[T]
     }
