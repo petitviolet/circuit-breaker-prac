@@ -21,22 +21,27 @@ private[supervisor] case object Close extends State
 private[supervisor] case object HalfOpen extends State
 private[supervisor] case object Open extends State
 
-sealed trait ExecuteMessage[T] {
-  val run: () => Future[T]
+sealed abstract class ExecuteMessage[T] {
+  private[supervisor] val run: () => Future[T]
 }
 
-class Execute[T](val run: () => Future[T]) extends ExecuteMessage[T]
+class Execute[T](task: => Future[T]) extends ExecuteMessage[T] {
+  private[supervisor] val run = () => task
+}
 
-class ExecuteWithFallback[T](val run: () => Future[T], val fallback: () => T) extends ExecuteMessage[T]
+class ExecuteWithFallback[T](task: => Future[T], _fallback: => T) extends ExecuteMessage[T] {
+  private[supervisor] val run = () => task
+  private[supervisor] def fallback = () => _fallback
+}
 
 object Execute {
-  def apply[T](run: => Future[T]): Execute[T] = new Execute(() => run)
+  def apply[T](run: => Future[T]): Execute[T] = new Execute(run)
 
   def unapply[T](execute: Execute[T]): Option[() => Future[T]] = Some(execute.run)
 }
 
 object ExecuteWithFallback {
-  def apply[T](run: => Future[T], fallback: => T): ExecuteWithFallback[T] = new ExecuteWithFallback(() => run, () => fallback)
+  def apply[T](run: => Future[T], fallback: => T): ExecuteWithFallback[T] = new ExecuteWithFallback(run, fallback)
 
   def unapply[T](execute: ExecuteWithFallback[T]): Option[(() => Future[T], () => T)] = Some(execute.run, execute.fallback)
 }
