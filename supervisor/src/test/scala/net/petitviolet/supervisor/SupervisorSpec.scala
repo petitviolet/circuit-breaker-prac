@@ -8,6 +8,7 @@ import akka.pattern._
 import akka.testkit._
 import net.petitviolet.supervisor.Supervisor._
 import org.scalatest.Assertion
+import org.scalatest.exceptions.TestFailedException
 
 import scala.concurrent.Future
 
@@ -179,4 +180,50 @@ class SupervisorSpec extends SpecBase("supervisor-spec") {
     }
 
   }
+
+  "Execute class" must {
+    "lazy valuation future" when {
+      "proper using" in {
+        val supervisor = buildSupervisorRef()
+        supervisor.underlyingActor.becomeOpen()
+
+        supervisor.receive(Execute(Future.successful(assert(false))), testActor)
+        expectMsg(Failure(MessageOnOpenException))
+      }
+
+      "not proper using" in {
+        val supervisor = buildSupervisorRef()
+        supervisor.underlyingActor.becomeOpen()
+
+        intercept[TestFailedException] {
+          val future = Future.successful(assert(false))
+          supervisor.receive(Execute(future), testActor)
+        }
+      }
+    }
+  }
+
+  "ExecuteWithFallback class" must {
+    val fallback = 100L
+    "lazy valuation future" when {
+      "proper using" in {
+        val supervisor = buildSupervisorRef()
+        supervisor.underlyingActor.becomeOpen()
+
+        supervisor.receive(ExecuteWithFallback(Future.successful(assert(false)), fallback), testActor)
+        expectMsg(Success(fallback))
+      }
+
+      "not proper using" in {
+        val supervisor = buildSupervisorRef()
+        supervisor.underlyingActor.becomeOpen()
+
+        intercept[TestFailedException] {
+          val future = Future.successful(assert(false))
+          supervisor.receive(ExecuteWithFallback(future, fallback), testActor)
+        }
+      }
+    }
+  }
+
 }
