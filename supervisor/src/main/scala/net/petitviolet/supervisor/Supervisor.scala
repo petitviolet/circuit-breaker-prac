@@ -159,8 +159,10 @@ final class Supervisor[T] private (maxFailCount: Int,
   private[this] def responseException: Receive = {
     case BecomeHalfOpen if this.state == Open =>
       becomeHalfOpen()
-    case message: Execute[_] =>
-      log.debug(s"state: $state, received: $message")
+    case ExecuteWithFallback(_, fallback) =>
+      sender ! Status.Success(fallback.apply)
+    case msg @ Execute(_) =>
+      log.debug(s"state: $state, received: $msg")
       sender ! Status.Failure(MessageOnOpenException)
     case ChildSuccess(originalSender, result) =>
       log.debug(s"state: $state, result: $result")
