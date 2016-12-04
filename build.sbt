@@ -1,6 +1,6 @@
 lazy val akkaVersion = "2.4.12"
 
-val VERSION = "0.2.0"
+val VERSION = "0.3.0"
 
 val GROUP_ID = "net.petitviolet"
 
